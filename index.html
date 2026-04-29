@@ -89,6 +89,11 @@
     <div class="selectors">
       <select id="sourceLang"></select>
       <div class="swap-btn" onclick="swapLanguages()">⇄ Swap</div>
+      <select id="voiceGender" style="padding:12px;border-radius:12px;">
+        <option value="neutral">🎧 Neutral</option>
+        <option value="female">👩 Girl Voice</option>
+        <option value="male">👨 Boy Voice</option>
+      </select>
       <select id="targetLang"></select>
     </div>
 
@@ -100,6 +105,7 @@
       <button onclick="speakOutput()">Speak Translation</button>
       <button onclick="copyOutput()">Copy Translation</button>
       <button onclick="clearAll()">Clear</button>
+      <button onclick="downloadVoice()">Download Voice</button>
     </div>
 
     <textarea id="outputText" placeholder="Translated text will appear here..." readonly></textarea>
@@ -171,15 +177,40 @@ async function translateText() {
 function speakText(text, lang) {
   if (!text) return;
   speechSynthesis.cancel();
+
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = lang;
+  const gender = document.getElementById('voiceGender')?.value || 'neutral';
 
   const voices = speechSynthesis.getVoices();
-  const preferredVoice = voices.find(v => v.lang.toLowerCase() === lang.toLowerCase()) ||
-                         voices.find(v => v.lang.toLowerCase().includes(lang.split('-')[0].toLowerCase()));
-  if (preferredVoice) utterance.voice = preferredVoice;
+
+  let filteredVoices = voices.filter(v =>
+    v.lang.toLowerCase().includes(lang.split('-')[0].toLowerCase()) ||
+    v.lang.toLowerCase().includes('fil') ||
+    v.lang.toLowerCase().includes('tl')
+  );
+
+  if (gender === 'female') {
+    filteredVoices = filteredVoices.filter(v =>
+      v.name.toLowerCase().includes('female') ||
+      v.name.toLowerCase().includes('woman') ||
+      v.name.toLowerCase().includes('girl')
+    );
+  } else if (gender === 'male') {
+    filteredVoices = filteredVoices.filter(v =>
+      v.name.toLowerCase().includes('male') ||
+      v.name.toLowerCase().includes('man') ||
+      v.name.toLowerCase().includes('boy')
+    );
+  }
+
+  const selectedVoice = filteredVoices[0] || voices.find(v => v.lang.toLowerCase().includes(lang.split('-')[0].toLowerCase()));
+
+  if (selectedVoice) utterance.voice = selectedVoice;
+  utterance.lang = selectedVoice ? selectedVoice.lang : lang;
+
   utterance.rate = 1;
-  utterance.pitch = 1;
+  utterance.pitch = gender === 'female' ? 1.2 : gender === 'male' ? 0.9 : 1;
+
   speechSynthesis.speak(utterance);
 }
 
@@ -211,6 +242,37 @@ function swapLanguages() {
   const tempText = document.getElementById('inputText').value;
   document.getElementById('inputText').value = document.getElementById('outputText').value;
   document.getElementById('outputText').value = tempText;
+}
+
+let mediaRecorder;
+let audioChunks = [];
+
+function downloadVoice() {
+  const text = document.getElementById('outputText').value;
+  if (!text) return alert('No translated text found');
+
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'voice.webm';
+      a.click();
+    };
+
+    mediaRecorder.start();
+    speakText(text, document.getElementById('targetLang').value);
+
+    setTimeout(() => {
+      if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    }, Math.min(text.length * 200, 8000));
+  }).catch(err => alert('Microphone permission required'));
 }
 </script>
 </body>
