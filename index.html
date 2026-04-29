@@ -94,6 +94,14 @@
         <option value="female">👩 Girl Voice</option>
         <option value="male">👨 Boy Voice</option>
       </select>
+
+      <select id="voiceAccent" style="padding:12px;border-radius:12px;">
+        <option value="default">🌐 Default Accent</option>
+        <option value="en-US">🇺🇸 US Accent</option>
+        <option value="en-GB">🇬🇧 UK Accent</option>
+        <option value="en-PH">🇵🇭 Philippines Accent</option>
+        <option value="en-AU">🇦🇺 Australia Accent</option>
+      </select>
       <select id="targetLang"></select>
     </div>
 
@@ -179,11 +187,14 @@ function speakText(text, lang) {
   speechSynthesis.cancel();
 
   const utterance = new SpeechSynthesisUtterance(text);
+
   const gender = document.getElementById('voiceGender')?.value || 'neutral';
+  const accent = document.getElementById('voiceAccent')?.value || lang;
 
   const voices = speechSynthesis.getVoices();
 
   let filteredVoices = voices.filter(v =>
+    v.lang.toLowerCase().includes(accent.split('-')[0].toLowerCase()) ||
     v.lang.toLowerCase().includes(lang.split('-')[0].toLowerCase()) ||
     v.lang.toLowerCase().includes('fil') ||
     v.lang.toLowerCase().includes('tl')
@@ -203,10 +214,10 @@ function speakText(text, lang) {
     );
   }
 
-  const selectedVoice = filteredVoices[0] || voices.find(v => v.lang.toLowerCase().includes(lang.split('-')[0].toLowerCase()));
+  const selectedVoice = filteredVoices[0] || voices.find(v => v.lang.toLowerCase().includes(accent.split('-')[0].toLowerCase()));
 
   if (selectedVoice) utterance.voice = selectedVoice;
-  utterance.lang = selectedVoice ? selectedVoice.lang : lang;
+  utterance.lang = selectedVoice ? selectedVoice.lang : accent;
 
   utterance.rate = 1;
   utterance.pitch = gender === 'female' ? 1.2 : gender === 'male' ? 0.9 : 1;
