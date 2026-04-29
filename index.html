@@ -189,41 +189,61 @@ function speakText(text, lang) {
   const utterance = new SpeechSynthesisUtterance(text);
 
   const gender = document.getElementById('voiceGender')?.value || 'neutral';
-  const accent = document.getElementById('voiceAccent')?.value || lang;
+  let accent = document.getElementById('voiceAccent')?.value || lang;
+
+  if (accent === 'default') accent = lang;
 
   const voices = speechSynthesis.getVoices();
 
-  let filteredVoices = voices.filter(v =>
-    v.lang.toLowerCase().includes(accent.split('-')[0].toLowerCase()) ||
-    v.lang.toLowerCase().includes(lang.split('-')[0].toLowerCase()) ||
-    v.lang.toLowerCase().includes('fil') ||
-    v.lang.toLowerCase().includes('tl')
-  );
+  // Try exact match first
+  let selectedVoice = voices.find(v => v.lang.toLowerCase() === accent.toLowerCase());
 
-  if (gender === 'female') {
-    filteredVoices = filteredVoices.filter(v =>
-      v.name.toLowerCase().includes('female') ||
-      v.name.toLowerCase().includes('woman') ||
-      v.name.toLowerCase().includes('girl')
-    );
-  } else if (gender === 'male') {
-    filteredVoices = filteredVoices.filter(v =>
-      v.name.toLowerCase().includes('male') ||
-      v.name.toLowerCase().includes('man') ||
-      v.name.toLowerCase().includes('boy')
+  // Fallback: match language only (en, tl, fil)
+  if (!selectedVoice) {
+    selectedVoice = voices.find(v => v.lang.toLowerCase().startsWith(accent.split('-')[0].toLowerCase()));
+  }
+
+  // Filipino fallback priority
+  if (!selectedVoice) {
+    selectedVoice = voices.find(v =>
+      v.lang.toLowerCase().includes('fil') ||
+      v.lang.toLowerCase().includes('tl') ||
+      v.lang.toLowerCase().includes('ph')
     );
   }
 
-  const selectedVoice = filteredVoices[0] || voices.find(v => v.lang.toLowerCase().includes(accent.split('-')[0].toLowerCase()));
+  // Gender filter (only if voice exists list)
+  if (selectedVoice && gender !== 'neutral') {
+    const genderVoices = voices.filter(v => v.lang === selectedVoice.lang);
 
-  if (selectedVoice) utterance.voice = selectedVoice;
-  utterance.lang = selectedVoice ? selectedVoice.lang : accent;
+    let filtered = genderVoices;
+
+    if (gender === 'female') {
+      filtered = genderVoices.filter(v =>
+        /female|woman|girl/i.test(v.name)
+      );
+    } else if (gender === 'male') {
+      filtered = genderVoices.filter(v =>
+        /male|man|boy/i.test(v.name)
+      );
+    }
+
+    if (filtered.length > 0) selectedVoice = filtered[0];
+  }
+
+  if (selectedVoice) {
+    utterance.voice = selectedVoice;
+    utterance.lang = selectedVoice.lang;
+  } else {
+    utterance.lang = accent;
+  }
 
   utterance.rate = 1;
   utterance.pitch = gender === 'female' ? 1.2 : gender === 'male' ? 0.9 : 1;
 
   speechSynthesis.speak(utterance);
 }
+
 
 function speakInput() {
   speakText(document.getElementById('inputText').value, sourceLang.value);
