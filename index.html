@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>AI Translate Voice</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body {
+      background: linear-gradient(135deg, #0f172a, #1e3a8a);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .container {
+      width: 100%;
+      max-width: 900px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 25px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 2rem;
+    }
+    .selectors {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+    select, textarea, button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+    }
+    textarea {
+      min-height: 160px;
+      resize: vertical;
+      margin-bottom: 15px;
+    }
+    button {
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      font-weight: bold;
+      transition: 0.3s;
+    }
+    button:hover { background: #1d4ed8; }
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .swap-btn {
+      padding: 12px 15px;
+      background: #334155;
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 15px;
+      opacity: 0.7;
+      font-size: 0.9rem;
+    }
+    @media(max-width:768px) {
+      .selectors {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌍 AI Translate Voice</h1>
+
+    <div class="selectors">
+      <select id="sourceLang"></select>
+      <div class="swap-btn" onclick="swapLanguages()">⇄ Swap</div>
+      <select id="targetLang"></select>
+    </div>
+
+    <textarea id="inputText" placeholder="Enter text to translate..."></textarea>
+
+    <div class="actions">
+      <button onclick="translateText()">Translate</button>
+      <button onclick="speakInput()">Speak Input</button>
+      <button onclick="speakOutput()">Speak Translation</button>
+      <button onclick="copyOutput()">Copy Translation</button>
+      <button onclick="clearAll()">Clear</button>
+    </div>
+
+    <textarea id="outputText" placeholder="Translated text will appear here..." readonly></textarea>
+
+    <div class="footer">Powered by AI Translation + Browser Voice Engine</div>
+  </div>
+
+<script>
+const languages = {
+  "en-US": "English (US)",
+  "en-PH": "English (Philippines)",
+  "tl-PH": "Tagalog (Philippines)",
+  "fil-PH": "Filipino (Philippines)",
+  "es-ES": "Spanish",
+  "fr-FR": "French",
+  "de-DE": "German",
+  "it-IT": "Italian",
+  "ja-JP": "Japanese",
+  "ko-KR": "Korean",
+  "zh-CN": "Chinese",
+  "ar-SA": "Arabic",
+  "hi-IN": "Hindi",
+  "ru-RU": "Russian",
+  "pt-PT": "Portuguese"
+};
+
+const sourceLang = document.getElementById('sourceLang');
+const targetLang = document.getElementById('targetLang');
+
+for (const code in languages) {
+  sourceLang.innerHTML += `<option value="${code}">${languages[code]}</option>`;
+  targetLang.innerHTML += `<option value="${code}">${languages[code]}</option>`;
+}
+
+sourceLang.value = 'en-US';
+targetLang.value = 'tl-PH';
+
+async function translateText() {
+  const text = document.getElementById('inputText').value.trim();
+  const source = sourceLang.value;
+  const target = targetLang.value;
+
+  if (!text) {
+    alert('Please enter text.');
+    return;
+  }
+
+  document.getElementById('outputText').value = 'Translating...';
+
+  try {
+    const response = await fetch('https://libretranslate.de/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        q: text,
+        source: source.split('-')[0],
+        target: target.split('-')[0],
+        format: 'text'
+      })
+    });
+
+    const data = await response.json();
+    document.getElementById('outputText').value = data.translatedText || 'Translation failed.';
+  } catch (error) {
+    document.getElementById('outputText').value = 'Translation service unavailable.';
+  }
+}
+
+function speakText(text, lang) {
+  if (!text) return;
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = lang;
+
+  const voices = speechSynthesis.getVoices();
+  const preferredVoice = voices.find(v => v.lang.toLowerCase() === lang.toLowerCase()) ||
+                         voices.find(v => v.lang.toLowerCase().includes(lang.split('-')[0].toLowerCase()));
+  if (preferredVoice) utterance.voice = preferredVoice;
+  utterance.rate = 1;
+  utterance.pitch = 1;
+  speechSynthesis.speak(utterance);
+}
+
+function speakInput() {
+  speakText(document.getElementById('inputText').value, sourceLang.value);
+}
+
+function speakOutput() {
+  speakText(document.getElementById('outputText').value, targetLang.value);
+}
+
+function copyOutput() {
+  const output = document.getElementById('outputText');
+  output.select();
+  document.execCommand('copy');
+  alert('Translation copied!');
+}
+
+function clearAll() {
+  document.getElementById('inputText').value = '';
+  document.getElementById('outputText').value = '';
+}
+
+function swapLanguages() {
+  const temp = sourceLang.value;
+  sourceLang.value = targetLang.value;
+  targetLang.value = temp;
+
+  const tempText = document.getElementById('inputText').value;
+  document.getElementById('inputText').value = document.getElementById('outputText').value;
+  document.getElementById('outputText').value = tempText;
+}
+</script>
+</body>
+</html>
