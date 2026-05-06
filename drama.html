@@ -1,0 +1,182 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dashflix Drama Player</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    .header {
+      padding: 15px;
+      text-align: center;
+      background: #1e293b;
+      font-size: 24px;
+      font-weight: bold;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .player-container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 10px;
+    }
+    video {
+      width: 100%;
+      border-radius: 12px;
+      background: black;
+      max-height: 70vh;
+    }
+    .controls {
+      margin-top: 10px;
+      background: #1e293b;
+      padding: 15px;
+      border-radius: 12px;
+    }
+    .volume-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .volume-control input {
+      flex: 1;
+    }
+    .episode-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      padding: 15px;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .episode-btn {
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .episode-btn:hover,
+    .episode-btn.active {
+      background: #dc2626;
+      transform: scale(1.05);
+    }
+    @media (max-width: 768px) {
+      .episode-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .header {
+        font-size: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">Drama Episodes 1-44</div>  <div class="player-container">
+    <video id="videoPlayer" controls autoplay playsinline></video><div class="controls">
+  <div><strong id="currentEpisode">Now Playing: Episode 1</strong></div>
+  <div class="volume-control">
+    <label>Volume Boost:</label>
+    <input type="range" id="volumeBoost" min="100" max="800" value="800">
+    <span id="volumeLabel">800%</span>
+  </div>
+</div>
+
+  </div>  <div class="episode-grid" id="episodeGrid"></div>  <script>
+    const episodes = {};
+    for (let i = 1; i <= 44; i++) {
+      episodes[`Episode ${i}`] = `https://cdn-ali-app.dashflix.com/hls/20067/${i}/${i}.m3u8`;
+    }
+
+    const video = document.getElementById('videoPlayer');
+    const episodeGrid = document.getElementById('episodeGrid');
+    const currentEpisode = document.getElementById('currentEpisode');
+    const volumeBoost = document.getElementById('volumeBoost');
+    const volumeLabel = document.getElementById('volumeLabel');
+
+    let hls;
+    let audioContext;
+    let sourceNode;
+    let gainNode;
+
+    function setupAudioBoost() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        sourceNode = audioContext.createMediaElementSource(video);
+        gainNode = audioContext.createGain();
+        sourceNode.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+      }
+      updateVolumeBoost();
+    }
+
+    function updateVolumeBoost() {
+      const boost = volumeBoost.value;
+      volumeLabel.textContent = boost + '%';
+      if (gainNode) {
+        gainNode.gain.value = boost / 100;
+      }
+    }
+
+    async function playEpisode(name, url) {
+      currentEpisode.textContent = `Now Playing: ${name}`;
+
+      document.querySelectorAll('.episode-btn').forEach(btn => btn.classList.remove('active'));
+      [...document.querySelectorAll('.episode-btn')].find(btn => btn.textContent === name)?.classList.add('active');
+
+      if (hls) hls.destroy();
+
+      if (Hls.isSupported()) {
+        hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, async () => {
+          try {
+            if (audioContext && audioContext.state === 'suspended') {
+              await audioContext.resume();
+            }
+            await video.play();
+          } catch(e) {}
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = url;
+        video.play();
+      }
+
+      setupAudioBoost();
+    }
+
+    Object.entries(episodes).forEach(([name, url], index) => {
+      const btn = document.createElement('button');
+      btn.className = 'episode-btn';
+      btn.textContent = name;
+      btn.onclick = () => playEpisode(name, url);
+      if (index === 0) btn.classList.add('active');
+      episodeGrid.appendChild(btn);
+    });
+
+    volumeBoost.addEventListener('input', updateVolumeBoost);
+
+    document.body.addEventListener('click', async () => {
+      if (audioContext && audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+    }, { once: true });
+
+    playEpisode('Episode 1', episodes['Episode 1']);
+  </script></body>
+</html>
